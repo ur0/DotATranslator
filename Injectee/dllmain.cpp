@@ -3,16 +3,16 @@
 #include <easyhook.h>
 #include <iostream>
 
-int64_t(*gOriginalPrintChat)(void *, int, char*, int);
+int64_t(*gOriginalPrintChat)(void *, int, WCHAR*, int);
 
-int64_t __fastcall printChatHook(void *a1, int a2, char* message, int a4) {
+int64_t __fastcall printChatHook(void *a1, int a2, WCHAR* message, int a4) {
 	std::cout << message;
 	return gOriginalPrintChat(a1, a2, message, a4);
 }
 
 extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO* inRemoteInfo) {
 	HMODULE hClient = GetModuleHandle(TEXT("client.dll"));
-	gOriginalPrintChat = (int64_t(*) (void *, int, char*, int))(hClient + 0x123);
+	gOriginalPrintChat = (int64_t(*) (void *, int, WCHAR*, int))(hClient + 0x180A588E0);
 	HOOK_TRACE_INFO hHook = { NULL };
 
 	std::cout << "Found printChat at: " << std::hex << gOriginalPrintChat << std::endl;
