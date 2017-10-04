@@ -75,6 +75,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <CustomBuildAfterTargets>Build</CustomBuildAfterTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -109,6 +110,14 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>..\packages\EasyHookNativePackage.2.7.6270\build\native\lib\x64\v140\Debug\EasyHook64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <CustomBuildStep>
+      <Command>COPY x64\$(Configuration)\Injectee.dll Translator\bin\$(Configuration)\</Command>
+      <Inputs>x64\$(Configuration)\Injectee.dll;%(Inputs)</Inputs>
+    </CustomBuildStep>
+    <PostBuildEvent>
+      <Command>del $(ProjectDir)..\Translator\bin\$(Configuration)\Injectee.dll
+copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration)\Injectee.dll</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -144,6 +153,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>..\packages\EasyHookNativePackage.2.7.6270\build\native\lib\x64\v140\Release\EasyHook64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
