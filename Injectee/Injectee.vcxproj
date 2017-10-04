@@ -115,8 +115,8 @@
       <Inputs>x64\$(Configuration)\Injectee.dll;%(Inputs)</Inputs>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>del $(ProjectDir)..\Translator\bin\$(Configuration)\Injectee.dll
-copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration)\Injectee.dll</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
