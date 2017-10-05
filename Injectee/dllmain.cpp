@@ -13,34 +13,46 @@ HOOK_TRACE_INFO ghHook;
 HANDLE ghPipe;
 
 void Log(char* msg) {
-#ifdef DEBUG
+#ifdef _DEBUG
 	*gLogFile << msg << "\r\n";
 	gLogFile->flush();
 #endif
 }
 
+void LogError() {
+#ifdef _DEBUG
+	char err[50];
+	snprintf(err, 50, "Error: %ld", GetLastError());
+	Log(err);
+#endif
+}
+
 void WriteChatMsgToNamedPipe(char* msg) {
-	WriteFile(ghPipe, msg, strlen(msg), NULL, NULL);
+	if (!WriteFile(ghPipe, msg, strlen(msg) + 1, NULL, NULL))
+		LogError();
 }
 
 int64_t __fastcall printChatHook(void *a1, int a2, WCHAR* message, int a4) {
 	_bstr_t narrow(message);
+	Log(narrow);
 	WriteChatMsgToNamedPipe(narrow);
 	return gOriginalPrintChat(a1, a2, message, a4);
 }
 
 extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE_ENTRY_INFO* inRemoteInfo) {
-#ifdef DEBUG
+#ifdef _DEBUG
 	gLogFile = new std::fstream("dt.log", std::ios::out);
 #endif
 
-	ghPipe = CreateFile(TEXT("\\\\.\\pipe\\DotATranslator"), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-	if (ghPipe == INVALID_HANDLE_VALUE)
+	ghPipe = CreateFile(L"\\\\.\\Pipe\\DotATranslator", GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+	if (ghPipe == INVALID_HANDLE_VALUE) {
 		Log("Can't connect to the pipe");
+		LogError();
+	}
 	else
 		Log("Connected to named pipe");
 
-	HMODULE hClient = GetModuleHandle(TEXT("client.dll"));
+	HMODULE hClient = GetModuleHandle(L"client.dll");
 	FARPROC ba = GetProcAddress(hClient, "BinaryProperties_GetValue");
 
 	gOriginalPrintChat = (int64_t(*) (void *, int, WCHAR*, int))((int64_t)ba + 0x358cc0);
