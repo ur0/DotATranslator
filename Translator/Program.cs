@@ -27,7 +27,8 @@ namespace Translator
             {
                 Console.WriteLine("Can't find Config.ini, creating one.");
                 File.AppendAllText("Config.ini", "[Translation]" + Environment.NewLine + "lang=en");
-                Console.WriteLine("A new configuration file has been created. Please edit Config.ini if you wish to change the language (currently English).");
+                Console.WriteLine("A new configuration file has been created.");
+                Console.WriteLine("Please edit Config.ini if you wish to change the language (currently English).");
                 TargetLang = "en";
             }
 
@@ -50,6 +51,8 @@ namespace Translator
             if (targetPID == 0)
             {
                 Console.WriteLine("You see, you need to run the game for the translator to do something!");
+                Console.WriteLine("Please start the translator after you start DotA 2");
+                Console.WriteLine("Press any key to close");
                 Console.ReadKey();
                 Environment.Exit(-1);
             }
@@ -116,7 +119,7 @@ namespace Translator
 
         static async void TranslateAndPrint(string message, NamedPipeServerStream sw)
         {
-            // These messages are already in the user's languages
+            // These messages are already in the user's language
             // They contain HTML too, so I'm not gonna bother translate them
             if (message.Contains("<img") || message.Contains("<font")) { return; }
 
