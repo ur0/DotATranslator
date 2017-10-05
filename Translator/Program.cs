@@ -7,6 +7,7 @@ using System.IO;
 using System.Net.Http;
 using Newtonsoft.Json.Linq;
 using IniParser;
+using System.Text;
 using IniParser.Model;
 
 namespace Translator
@@ -44,7 +45,11 @@ namespace Translator
                 Environment.Exit(-1);
             }
 
-            var server = new NamedPipeServerStream("DotATranslator");
+            // Pipe 1 is used for game->translator communication
+            // Pipe 2 is used for translator->game communication
+            // I was having concurrency issues with using a single pipe
+            var server1 = new NamedPipeServerStream("DotATranslator1");
+            var server2 = new NamedPipeServerStream("DotATranslator2");
 
             try
             {
@@ -57,18 +62,19 @@ namespace Translator
                 Environment.Exit(-1);
             }
 
-            ListenPipeAndTranslate(server);
+            ListenPipeAndTranslate(server1, server2);
             Console.Read();
         }
 
-        static async void ListenPipeAndTranslate(NamedPipeServerStream server)
+        static async void ListenPipeAndTranslate(NamedPipeServerStream server1, NamedPipeServerStream server2)
         {
-            var sr = new StreamReader(server);
+            var sr = new StreamReader(server1);
             do
             {
                 try
                 {
-                    await server.WaitForConnectionAsync();
+                    await server1.WaitForConnectionAsync();
+                    await server2.WaitForConnectionAsync();
                     Console.WriteLine("GLHF!");
                     char[] buffer = new char[1000];
                     while (true)
@@ -85,9 +91,7 @@ namespace Translator
                             }
                         }
                         sb.Append(buffer, 0, endIdx + 1);
-                        Console.Write("Incoming: ");
-                        Console.WriteLine(sb);
-                        TranslateAndPrint(sb.ToString());
+                        TranslateAndPrint(sb.ToString(), server2);
                     }
                 }
                 catch (Exception)
@@ -97,33 +101,47 @@ namespace Translator
                 }
                 finally
                 {
-                    server.WaitForPipeDrain();
-                    if (server.IsConnected) { server.Disconnect(); }
+                    server1.WaitForPipeDrain();
+                    if (server1.IsConnected) { server1.Disconnect(); }
+                    server2.WaitForPipeDrain();
+                    if (server2.IsConnected) { server2.Disconnect(); }
                 }
             } while (true);
         }
 
-        static async void TranslateAndPrint(string message)
+        static async void TranslateAndPrint(string message, NamedPipeServerStream sw)
         {
-            if (message.Contains("<img") || message.Contains("<font"))
-            {
-                return;
-            }
+            // These messages are already in the user's languages
+            // They contain HTML too, so I'm not gonna bother translate them
+            if (message.Contains("<img") || message.Contains("<font")) { return; }
 
             try
             {
-                string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q=" + WebUtility.UrlEncode(message);
+                string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=" + TargetLang + "&dt=t&q=" + WebUtility.UrlEncode(message);
                 HttpClient hc = new HttpClient();
                 HttpResponseMessage r = await hc.GetAsync(url);
                 String rs = await r.Content.ReadAsStringAsync();
                 dynamic d = JArray.Parse(rs);
                 string translated = d[0][0][0];
                 string sourcelang = d[2];
-                Console.Write("Translated from " + sourcelang + ": ");
-                Console.WriteLine(translated);
-            } catch (Exception)
+                string toSend = "(Translated from " + sourcelang + ") " + translated;
+                if (sourcelang != TargetLang)
+                {
+                    UnicodeEncoding ue = new UnicodeEncoding(false, false, false);
+                    byte[] sendBytes = ue.GetBytes(toSend);
+                    byte[] size = new byte[1];
+                    size[0] = Convert.ToByte(sendBytes.Length);
+                    sw.Write(size, 0, 1);
+                    sw.Write(sendBytes, 0, sendBytes.Length);
+                    sw.Flush();
+                    Console.WriteLine(toSend);
+                }
+            }
+            catch (Exception e)
             {
-                Console.WriteLine("Unable to translate, check your connection");
+                // If you close DotA 2 before closing the translator
+                Console.Write("Unable to translate, check your connection: ");
+                Console.WriteLine(e.Message);
                 return;
             }
         }
