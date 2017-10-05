@@ -6,7 +6,7 @@
 #include <fstream>
 #include <comdef.h>
 
-int64_t(*gOriginalPrintChat)(void *, int, WCHAR*, int);
+int64_t(*gOriginalPrintChat)(void *, int, wchar_t*, int);
 
 std::fstream* gLogFile;
 HOOK_TRACE_INFO ghHook;
@@ -30,15 +30,20 @@ void LogError(std::fstream* f = gLogFile) {
 #endif
 }
 
-void WriteChatMsgToNamedPipe(char* msg) {
-	if (!WriteFile(ghPipe1, msg, strlen(msg) + 1, NULL, NULL))
+void WriteChatMsgToNamedPipe(wchar_t* msg) {
+	short len = (short)(wcslen(msg) * sizeof(wchar_t));
+#ifdef _DEBUG
+	*gLogFile << "Byte length: " << (int)len << "\r\n";
+	gLogFile->flush();
+#endif // _DEBUG
+	if (!WriteFile(ghPipe1, &len, 2, NULL, NULL))
+		LogError();
+	if (!WriteFile(ghPipe1, msg, (int)len, NULL, NULL))
 		LogError();
 }
 
-int64_t __fastcall PrintChatHook(void *a1, int a2, WCHAR* message, int a4) {
-	_bstr_t narrow(message);
-	Log(narrow);
-	WriteChatMsgToNamedPipe(narrow);
+int64_t __fastcall PrintChatHook(void *a1, int a2, wchar_t* message, int a4) {
+	WriteChatMsgToNamedPipe(message);
 	ga1 = a1;
 	ga2 = a2;
 	ga4 = a4;
@@ -46,19 +51,22 @@ int64_t __fastcall PrintChatHook(void *a1, int a2, WCHAR* message, int a4) {
 }
 
 DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
-	int64_t(*bypassAddr)(void*, int, WCHAR*, int) = 0;
+	int64_t(*bypassAddr)(void*, int, wchar_t*, int) = 0;
 	LhGetHookBypassAddress(&ghHook, &(PVOID *)bypassAddr);
 	Log("Client pipe listener ready");
 
 	while (true) {
-		byte numBytes;
-		bool didRead = ReadFile(ghPipe2, &numBytes, 1, NULL, NULL);
+		short numBytes;
+		bool didRead = ReadFile(ghPipe2, &numBytes, 2, NULL, NULL);
+#ifdef _DEBUG
+		*gLogFile << "numBytes: " << (int)numBytes << "\r\n";
+		gLogFile->flush();
+#endif
 		if (!didRead) {
 			Log("Can't read from pipe");
 			LogError();
 			return 0;
 		}
-		*gLogFile << "Have "<< (int)numBytes << " bytes in incoming pipe.\r\n";
 
 		byte* buf = new byte[numBytes + 2];
 		didRead = ReadFile(ghPipe2, buf, numBytes, NULL, NULL);
@@ -72,11 +80,8 @@ DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 
 		Log("Message read from pipe successfully");
 		size_t l = wcslen((wchar_t *)buf);
-		
-		*gLogFile << "Message length: " << l << "\r\n";
-		gLogFile->flush();
 
-		bypassAddr(ga1, ga2, (WCHAR *)buf, ga4);
+		bypassAddr(ga1, ga2, (wchar_t *)buf, ga4);
 		delete buf;
 		Log("Injected translated message successfully");
 	}
@@ -101,7 +106,7 @@ extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE
 	HMODULE hClient = GetModuleHandle(L"client.dll");
 	FARPROC ba = GetProcAddress(hClient, "BinaryProperties_GetValue");
 
-	gOriginalPrintChat = (int64_t(*) (void *, int, WCHAR*, int))((int64_t)ba + 0x358cc0);
+	gOriginalPrintChat = (int64_t(*) (void *, int, wchar_t*, int))((int64_t)ba + 0x358cc0);
 	CreateThread(0, 0, ListenPipeAndPrint, 0, 0, 0);
 	ghHook = { NULL };
 

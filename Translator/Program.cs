@@ -23,7 +23,7 @@ namespace Translator
             TargetLang = data["Translation"]["lang"];
 
             Console.WriteLine("Welcome to DotA 2 Translator");
-            Console.WriteLine("Translating to: " + TargetLang);
+            Console.WriteLine("Translating to: " + TargetLang + " (edit Config.ini to change this).");
 
             int targetPID = 0;
             Process[] processes = Process.GetProcesses();
@@ -40,7 +40,7 @@ namespace Translator
             }
             if (targetPID == 0)
             {
-                Console.WriteLine("You see, you need to run the game for the translator to do something");
+                Console.WriteLine("You see, you need to run the game for the translator to do something!");
                 Console.ReadKey();
                 Environment.Exit(-1);
             }
@@ -48,6 +48,7 @@ namespace Translator
             // Pipe 1 is used for game->translator communication
             // Pipe 2 is used for translator->game communication
             // I was having concurrency issues with using a single pipe
+            // Also, these pipes need to exist before the injection occurs (please don't move this, it'll lead to races)
             var server1 = new NamedPipeServerStream("DotATranslator1");
             var server2 = new NamedPipeServerStream("DotATranslator2");
 
@@ -57,6 +58,7 @@ namespace Translator
             }
             catch (Exception e)
             {
+                Console.WriteLine("Could not inject our DLL into DotA 2. Please send the following message to /u/ur_0 for help");
                 Console.WriteLine(e.Message);
                 Console.Read();
                 Environment.Exit(-1);
@@ -68,7 +70,6 @@ namespace Translator
 
         static async void ListenPipeAndTranslate(NamedPipeServerStream server1, NamedPipeServerStream server2)
         {
-            var sr = new StreamReader(server1);
             do
             {
                 try
@@ -76,22 +77,15 @@ namespace Translator
                     await server1.WaitForConnectionAsync();
                     await server2.WaitForConnectionAsync();
                     Console.WriteLine("GLHF!");
-                    char[] buffer = new char[1000];
                     while (true)
                     {
-                        System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                        await sr.ReadAsync(buffer, 0, 1000);
-                        int endIdx = 0;
-                        for (int i = 0; i < 1000; i++)
-                        {
-                            if (buffer[i] == '\0')
-                            {
-                                endIdx = i;
-                                break;
-                            }
-                        }
-                        sb.Append(buffer, 0, endIdx + 1);
-                        TranslateAndPrint(sb.ToString(), server2);
+                        byte[] buffer = new byte[1000];
+                        server1.Read(buffer, 0, 2);
+                        int numBytes = BitConverter.ToUInt16(buffer, 0);
+                        server1.Read(buffer, 0, numBytes);
+                        Array.Resize(ref buffer, numBytes);
+                        
+                        TranslateAndPrint(Encoding.Unicode.GetString(buffer), server2);
                     }
                 }
                 catch (Exception)
@@ -124,14 +118,15 @@ namespace Translator
                 dynamic d = JArray.Parse(rs);
                 string translated = d[0][0][0];
                 string sourcelang = d[2];
-                string toSend = "(Translated from " + sourcelang + ") " + translated;
+                string toSend = "(Translated from " + sourcelang + "): " + translated;
                 if (sourcelang != TargetLang)
                 {
                     UnicodeEncoding ue = new UnicodeEncoding(false, false, false);
                     byte[] sendBytes = ue.GetBytes(toSend);
-                    byte[] size = new byte[1];
-                    size[0] = Convert.ToByte(sendBytes.Length);
-                    sw.Write(size, 0, 1);
+                    byte[] size = BitConverter.GetBytes((UInt16)sendBytes.Length);
+                    // Write the number of raw bytes in this message
+                    sw.Write(size, 0, 2);
+                    // Write the UTF-16 encoded message
                     sw.Write(sendBytes, 0, sendBytes.Length);
                     sw.Flush();
                     Console.WriteLine(toSend);
