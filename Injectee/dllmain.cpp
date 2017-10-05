@@ -35,7 +35,7 @@ void WriteChatMsgToNamedPipe(wchar_t* msg) {
 #ifdef _DEBUG
 	*gLogFile << "Byte length: " << (int)len << "\r\n";
 	gLogFile->flush();
-#endif // _DEBUG
+#endif
 	if (!WriteFile(ghPipe1, &len, 2, NULL, NULL))
 		LogError();
 	if (!WriteFile(ghPipe1, msg, (int)len, NULL, NULL))
@@ -52,7 +52,7 @@ int64_t __fastcall PrintChatHook(void *a1, int a2, wchar_t* message, int a4) {
 
 DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 	int64_t(*bypassAddr)(void*, int, wchar_t*, int) = 0;
-	LhGetHookBypassAddress(&ghHook, &(PVOID *)bypassAddr);
+	LhGetHookBypassAddress(&ghHook, (PVOID **)&bypassAddr);
 	Log("Client pipe listener ready");
 
 	while (true) {

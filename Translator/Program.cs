@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using IniParser;
 using System.Text;
 using IniParser.Model;
+using System.Threading;
 
 namespace Translator
 {
@@ -151,7 +152,8 @@ namespace Translator
                 // If you close DotA 2 before closing the translator
                 Console.Write("Unable to translate, check your connection: ");
                 Console.WriteLine(e.Message);
-                return;
+                Thread.Sleep(2000);
+                Environment.Exit(-1);
             }
         }
     }
