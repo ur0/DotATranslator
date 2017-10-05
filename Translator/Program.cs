@@ -18,11 +18,20 @@ namespace Translator
 
         static void Main(string[] args)
         {
-            var parser = new FileIniDataParser();
-            IniData data = parser.ReadFile("Config.ini");
-            TargetLang = data["Translation"]["lang"];
+            try
+            {
+                var parser = new FileIniDataParser();
+                IniData data = parser.ReadFile("Config.ini");
+                TargetLang = data["Translation"]["lang"];
+            } catch
+            {
+                Console.WriteLine("Can't find Config.ini, creating one.");
+                File.AppendAllText("Config.ini", "[Translation]" + Environment.NewLine + "lang=en");
+                Console.WriteLine("A new configuration file has been created. Please edit Config.ini if you wish to change the language (currently English).");
+                TargetLang = "en";
+            }
 
-            Console.WriteLine("Welcome to DotA 2 Translator");
+            Console.WriteLine("Welcome to DotA 2 Translator (v2)");
             Console.WriteLine("Translating to: " + TargetLang + " (edit Config.ini to change this).");
 
             int targetPID = 0;
@@ -58,14 +67,16 @@ namespace Translator
             }
             catch (Exception e)
             {
-                Console.WriteLine("Could not inject our DLL into DotA 2. Please send the following message to /u/ur_0 for help");
+                Console.WriteLine("Could not inject our DLL into DotA 2. Please post the following message on /r/dotatranslator for help");
                 Console.WriteLine(e.Message);
-                Console.Read();
+                Console.ReadKey();
                 Environment.Exit(-1);
             }
 
             ListenPipeAndTranslate(server1, server2);
-            Console.Read();
+            Console.ReadKey();
+            // Should be unreachable
+            Environment.Exit(-2);
         }
 
         static async void ListenPipeAndTranslate(NamedPipeServerStream server1, NamedPipeServerStream server2)
