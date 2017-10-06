@@ -154,7 +154,8 @@
       <AdditionalDependencies>..\packages\EasyHookNativePackage.2.7.6270\build\native\lib\x64\v140\Release\EasyHook64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
+      <Command>mkdir $(ProjectDir)..\Translator\bin\$(Configuration)
+copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
