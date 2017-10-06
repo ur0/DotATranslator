@@ -8,6 +8,12 @@
 
 int64_t(*gOriginalPrintChat)(void *, int, wchar_t*, int);
 
+struct SavedPrintChatParams {
+	void* a1;
+	int a2;
+	int a4;
+};
+
 std::fstream* gLogFile;
 HOOK_TRACE_INFO ghHook;
 HANDLE ghPipe1, ghPipe2;
@@ -23,7 +29,7 @@ void LogError() {
 #ifdef _DEBUG
 	char err[50];
 	snprintf(err, 50, "Error: %ld", GetLastError());
-	Log(err, gLogFile);
+	Log(err);
 #endif
 }
 
@@ -40,19 +46,17 @@ void WriteChatMsgToNamedPipe(wchar_t* msg) {
 }
 
 void WriteMessageParamsToNamedPipe(void *a1, int a2, int a4) {
-	short size = sizeof(a1) + sizeof(a2) + sizeof(a4);
-	char *params = new char[size];
+	SavedPrintChatParams params;
+	short size = sizeof(params);
 
-	*(unsigned long long *)params = (unsigned long long)a1;
-	*(int *)(params + 8) = a2;
-	*(int *)(params + 12) = a4;
+	params.a1 = a1;
+	params.a2 = a2;
+	params.a4 = a4;
 
 	if (!WriteFile(ghPipe1, &size, sizeof(size), NULL, NULL))
 		LogError();
-	if (!WriteFile(ghPipe1, params, size, NULL, NULL))
+	if (!WriteFile(ghPipe1, &params, size, NULL, NULL))
 		LogError();
-
-	delete params;
 }
 
 int64_t __fastcall PrintChatHook(void *a1, int a2, wchar_t* message, int a4) {
@@ -98,28 +102,21 @@ DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 		size_t l = wcslen((wchar_t *)buf);
 
 		// Retrive the message parameters
-		void *a1;
-		int a2, a4;
-		short size = sizeof(a1) + sizeof(a2) + sizeof(a4);
-		byte *params = new byte[size];
-		if (!ReadFile(ghPipe2, params, size, NULL, NULL))
+		SavedPrintChatParams params;
+		if (!ReadFile(ghPipe2, &params, sizeof(params), NULL, NULL))
 			LogError();
-		a1 = (void *)*(unsigned long long*)params;
-		a2 = (int)*(params + sizeof(a1));
-		a4 = (int)*(params + sizeof(a1) + sizeof(a2));
 
 		Log("Message parameters read from pipe successfully");
 #ifdef _DEBUG
 		*gLogFile << "Status at recv:\r\n";
-		*gLogFile << "a1: " << std::hex << a1;
-		*gLogFile << "\r\na2: " << std::hex << a2;
-		*gLogFile << "\r\na4: " << std::hex << a4 << "\r\n";
+		*gLogFile << "a1: " << std::hex << params.a1;
+		*gLogFile << "\r\na2: " << std::hex << params.a2;
+		*gLogFile << "\r\na4: " << std::hex << params.a4 << "\r\n";
 		gLogFile->flush();
 #endif
 
-		bypassAddr(a1, a2, (wchar_t *)buf, a4);
+		bypassAddr(params.a1, params.a2, (wchar_t *)buf, params.a4);
 		delete buf;
-		delete params;
 		Log("Injected translated message successfully");
 	}
 
