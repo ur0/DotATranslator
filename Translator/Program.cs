@@ -80,8 +80,7 @@ namespace Translator
 
             ListenPipeAndTranslate(server1, server2);
             Console.ReadKey();
-            // Should be unreachable
-            Environment.Exit(-2);
+            Environment.Exit(0);
         }
 
         static async void ListenPipeAndTranslate(NamedPipeServerStream server1, NamedPipeServerStream server2)
@@ -93,7 +92,7 @@ namespace Translator
                     await server1.WaitForConnectionAsync();
                     await server2.WaitForConnectionAsync();
                     Console.WriteLine("GLHF!");
-                    while (true)
+                    while (true && server1.IsConnected && server2.IsConnected)
                     {
                         byte[] buffer = new byte[1000];
                         server1.Read(buffer, 0, 2);
@@ -102,7 +101,7 @@ namespace Translator
                         Array.Resize(ref buffer, numBytes);
 
                         if (numBytes == 0)
-                            return;
+                            continue;
 
                         byte[] messageParams = new byte[100];
                         server1.Read(messageParams, 0, 2);
@@ -116,16 +115,8 @@ namespace Translator
                 catch (Exception e)
                 {
                     Console.WriteLine(e.ToString());
-                    Console.WriteLine("Injectee disconnected, exiting");
-                    Console.WriteLine(e);
-                    Environment.Exit(0);
-                }
-                finally
-                {
-                    server1.WaitForPipeDrain();
-                    if (server1.IsConnected) { server1.Disconnect(); }
-                    server2.WaitForPipeDrain();
-                    if (server2.IsConnected) { server2.Disconnect(); }
+                    Console.WriteLine("DotA 2 has exited - press any key to close.");
+                    return;
                 }
             } while (true);
         }
