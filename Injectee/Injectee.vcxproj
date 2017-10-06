@@ -155,7 +155,9 @@
     </Link>
     <PostBuildEvent>
       <Command>mkdir $(ProjectDir)..\Translator\bin\$(Configuration)
-copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
+copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y
+copy $(ProjectDir)..\x64\$(Configuration)\Injectee.pdb $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
+      <Message>Copy artifacts</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
