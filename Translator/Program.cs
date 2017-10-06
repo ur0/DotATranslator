@@ -24,7 +24,8 @@ namespace Translator
                 var parser = new FileIniDataParser();
                 IniData data = parser.ReadFile("Config.ini");
                 TargetLang = data["Translation"]["lang"];
-            } catch
+            }
+            catch
             {
                 Console.WriteLine("Can't find Config.ini, creating one.");
                 File.AppendAllText("Config.ini", "[Translation]" + Environment.NewLine + "lang=en");
@@ -99,13 +100,24 @@ namespace Translator
                         int numBytes = BitConverter.ToUInt16(buffer, 0);
                         server1.Read(buffer, 0, numBytes);
                         Array.Resize(ref buffer, numBytes);
-                        
-                        TranslateAndPrint(Encoding.Unicode.GetString(buffer), server2);
+
+                        if (numBytes == 0)
+                            return;
+
+                        byte[] messageParams = new byte[100];
+                        server1.Read(messageParams, 0, 2);
+                        numBytes = BitConverter.ToUInt16(messageParams, 0);
+                        server1.Read(messageParams, 0, numBytes);
+                        Array.Resize(ref messageParams, numBytes);
+
+                        TranslateAndPrint(Encoding.Unicode.GetString(buffer), server2, messageParams);
                     }
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    Console.WriteLine(e.ToString());
                     Console.WriteLine("Injectee disconnected, exiting");
+                    Console.WriteLine(e);
                     Environment.Exit(0);
                 }
                 finally
@@ -118,7 +130,7 @@ namespace Translator
             } while (true);
         }
 
-        static async void TranslateAndPrint(string message, NamedPipeServerStream sw)
+        static async void TranslateAndPrint(string message, NamedPipeServerStream sw, byte[] messageParams)
         {
             // These messages are already in the user's language
             // They contain HTML too, so I'm not gonna bother translate them
@@ -133,6 +145,7 @@ namespace Translator
                 dynamic d = JArray.Parse(rs);
                 string translated = d[0][0][0];
                 string sourcelang = d[2];
+                Console.WriteLine("Original: " + message);
                 string toSend = "(Translated from " + sourcelang + "): " + translated;
                 if (sourcelang != TargetLang)
                 {
@@ -143,6 +156,8 @@ namespace Translator
                     sw.Write(size, 0, 2);
                     // Write the UTF-16 encoded message
                     sw.Write(sendBytes, 0, sendBytes.Length);
+                    // Write the message parameters
+                    sw.Write(messageParams, 0, messageParams.Length);
                     sw.Flush();
                     Console.WriteLine(toSend);
                 }

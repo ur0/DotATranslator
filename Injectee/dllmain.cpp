@@ -11,22 +11,19 @@ int64_t(*gOriginalPrintChat)(void *, int, wchar_t*, int);
 std::fstream* gLogFile;
 HOOK_TRACE_INFO ghHook;
 HANDLE ghPipe1, ghPipe2;
-// Saved args for later printing
-void *ga1;
-int ga2, ga4;
 
-void Log(char* msg, std::fstream* f = gLogFile) {
+void Log(char* msg) {
 #ifdef _DEBUG
-	*f << msg << "\r\n";
-	f->flush();
+	*gLogFile << msg << "\r\n";
+	gLogFile->flush();
 #endif
 }
 
-void LogError(std::fstream* f = gLogFile) {
+void LogError() {
 #ifdef _DEBUG
 	char err[50];
 	snprintf(err, 50, "Error: %ld", GetLastError());
-	Log(err, f);
+	Log(err, gLogFile);
 #endif
 }
 
@@ -42,11 +39,32 @@ void WriteChatMsgToNamedPipe(wchar_t* msg) {
 		LogError();
 }
 
+void WriteMessageParamsToNamedPipe(void *a1, int a2, int a4) {
+	short size = sizeof(a1) + sizeof(a2) + sizeof(a4);
+	char *params = new char[size];
+
+	*(unsigned long long *)params = (unsigned long long)a1;
+	*(int *)(params + 8) = a2;
+	*(int *)(params + 12) = a4;
+
+	if (!WriteFile(ghPipe1, &size, sizeof(size), NULL, NULL))
+		LogError();
+	if (!WriteFile(ghPipe1, params, size, NULL, NULL))
+		LogError();
+
+	delete params;
+}
+
 int64_t __fastcall PrintChatHook(void *a1, int a2, wchar_t* message, int a4) {
 	WriteChatMsgToNamedPipe(message);
-	ga1 = a1;
-	ga2 = a2;
-	ga4 = a4;
+	WriteMessageParamsToNamedPipe(a1, a2, a4);
+#ifdef _DEBUG
+	*gLogFile << "Status at send:\r\n";
+	*gLogFile << "a1: " << std::hex << a1;
+	*gLogFile << "\r\na2: " << std::hex << a2;
+	*gLogFile << "\r\na4: " << std::hex << a4 << "\r\n";
+	gLogFile->flush();
+#endif
 	return gOriginalPrintChat(a1, a2, message, a4);
 }
 
@@ -57,20 +75,18 @@ DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 
 	while (true) {
 		short numBytes;
-		bool didRead = ReadFile(ghPipe2, &numBytes, 2, NULL, NULL);
-#ifdef _DEBUG
-		*gLogFile << "numBytes: " << (int)numBytes << "\r\n";
-		gLogFile->flush();
-#endif
-		if (!didRead) {
+		if (!ReadFile(ghPipe2, &numBytes, 2, NULL, NULL)) {
 			Log("Can't read from pipe");
 			LogError();
 			return 0;
 		}
+#ifdef _DEBUG
+		*gLogFile << "numBytes: " << (int)numBytes << "\r\n";
+		gLogFile->flush();
+#endif
 
 		byte* buf = new byte[numBytes + 2];
-		didRead = ReadFile(ghPipe2, buf, numBytes, NULL, NULL);
-		if (!didRead) {
+		if (!ReadFile(ghPipe2, buf, numBytes, NULL, NULL)) {
 			Log("Can't read from pipe");
 			LogError();
 			return 0;
@@ -81,8 +97,29 @@ DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 		Log("Message read from pipe successfully");
 		size_t l = wcslen((wchar_t *)buf);
 
-		bypassAddr(ga1, ga2, (wchar_t *)buf, ga4);
+		// Retrive the message parameters
+		void *a1;
+		int a2, a4;
+		short size = sizeof(a1) + sizeof(a2) + sizeof(a4);
+		byte *params = new byte[size];
+		if (!ReadFile(ghPipe2, params, size, NULL, NULL))
+			LogError();
+		a1 = (void *)*(unsigned long long*)params;
+		a2 = (int)*(params + sizeof(a1));
+		a4 = (int)*(params + sizeof(a1) + sizeof(a2));
+
+		Log("Message parameters read from pipe successfully");
+#ifdef _DEBUG
+		*gLogFile << "Status at recv:\r\n";
+		*gLogFile << "a1: " << std::hex << a1;
+		*gLogFile << "\r\na2: " << std::hex << a2;
+		*gLogFile << "\r\na4: " << std::hex << a4 << "\r\n";
+		gLogFile->flush();
+#endif
+
+		bypassAddr(a1, a2, (wchar_t *)buf, a4);
 		delete buf;
+		delete params;
 		Log("Injected translated message successfully");
 	}
 
