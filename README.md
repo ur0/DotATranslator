@@ -1,4 +1,4 @@
-# DotATranslator (v2)
+# DotATranslator (v2) [![Build status](https://ci.appveyor.com/api/projects/status/srpwdnhf4mlglmca/branch/master?svg=true)](https://ci.appveyor.com/project/ur0/dotatranslator/branch/master)
 
 This is DotA translator, a utility which translates DotA 2 text chat into your 
 favourite language (and pops the results back into the chat pane). It works
