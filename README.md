@@ -60,8 +60,7 @@ I'm looking into automatic updates but don't expect it just yet. Sorryz.
 
 ## VAC
 
-C'mon. This isn't a cheat. I've had people testing this out on Ranked for a
-couple of days and nothing's gone wrong. I've mailed Valve anyways
+C'mon. This isn't a cheat. I've mailed Valve anyways
 (just to be sure). There are legitimate utilities that do a lot more stuff
 than this, in even shadier ways (looking at you, Discord Overlay). You can
 be sure that this isn't gonna get you banned, promise!
@@ -86,6 +85,11 @@ I'll probably implement Linux first. While it requires the entire thing to be
 rewritten in C++, I'm pretty familiar with hooking functions there. Win32
 support will need changes to the underlying library, EasyHook.
 
+## Credits
+
+Huge thanks to [/u/airoes](https://reddit.com/user/airoes) for letting me use
+the r/dotatranslator subreddit and (slightly modified) name.
+
 ## Lawyer stuff
 
 DotA Translator v2 is (c) Umang Raghuvanshi, 2017. The source code (excluding
@@ -93,6 +97,3 @@ any dependencies) is licensed to you under the MIT license, contents of which
 are in the LICENSE.txt file.
 
 Lawyers, let me know if this didn't sound like absolute nonsense.
-
-DotA Translator Reborn (currently defunct, which inspired me to write this) was
-written by [/u/airoes](https://reddit.com/user/airoes).
