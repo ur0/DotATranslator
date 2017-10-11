@@ -5,8 +5,13 @@
 #include <assert.h>
 #include <fstream>
 #include <comdef.h>
+#include <Psapi.h>
+
+// The function prologue for CDOTA_SF_Hud_Chat::MessagePrintf
+const byte gcSignature[] = { 0x48,0x8B,0xC4,0x55,0x56,0x41,0x55,0x41,0x56,0x41,0x57 };
 
 int64_t(*gOriginalPrintChat)(void *, int, wchar_t*, int);
+int64_t(*gBypassAddr)(void *, int, wchar_t*, int);
 
 struct SavedPrintChatParams {
 	void* a1;
@@ -73,9 +78,12 @@ int64_t __fastcall PrintChatHook(void *a1, int a2, wchar_t* message, int a4) {
 }
 
 DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
-	int64_t(*bypassAddr)(void*, int, wchar_t*, int) = 0;
-	LhGetHookBypassAddress(&ghHook, (PVOID **)&bypassAddr);
 	Log("Client pipe listener ready");
+	if (!gBypassAddr) {
+		Log("Bad hook bypass address");
+		return 0;
+	}
+
 
 	while (true) {
 		short numBytes;
@@ -115,11 +123,35 @@ DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 		gLogFile->flush();
 #endif
 
-		bypassAddr(params.a1, params.a2, (wchar_t *)buf, params.a4);
+		gBypassAddr(params.a1, params.a2, (wchar_t *)buf, params.a4);
 		delete buf;
 		Log("Injected translated message successfully");
 	}
 
+	return 0;
+}
+
+void *FindPrintChatAddr(MODULEINFO *mi) {
+	byte *baseAddr = (byte *)mi->lpBaseOfDll;
+	DWORD dllSize = mi->SizeOfImage;
+
+	if (!baseAddr || !dllSize) {
+		Log("Invalid MODULEINFO");
+		return 0;
+	}
+
+	for (DWORD i = 0; i < dllSize; i++) {
+		for (int j = 0; j < sizeof(gcSignature); j++) {
+			if (*(baseAddr + j) != gcSignature[j])
+				break;
+
+			if (j == sizeof(gcSignature) - 1)
+				return (void *)baseAddr;
+		}
+		baseAddr++;
+	}
+
+	Log("Could not find PrintChat!");
 	return 0;
 }
 
@@ -137,14 +169,23 @@ extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE
 	else
 		Log("Connected to named pipes");
 
-	HMODULE hClient = GetModuleHandle(L"client.dll");
-	FARPROC ba = GetProcAddress(hClient, "BinaryProperties_GetValue");
+	HMODULE hClientDll = GetModuleHandle(L"client.dll");
+	HANDLE hProcess = GetCurrentProcess();
+	MODULEINFO mi;
+	if (!GetModuleInformation(hProcess, hClientDll, &mi, sizeof(mi))) {
+		Log("Could not get module information");
+		return;
+	}
 
-	gOriginalPrintChat = (int64_t(*) (void *, int, wchar_t*, int))((int64_t)ba + 0x358cc0);
-	CreateThread(0, 0, ListenPipeAndPrint, 0, 0, 0);
+	gOriginalPrintChat = (int64_t(*) (void *, int, wchar_t*, int))FindPrintChatAddr(&mi);
+	if (!gOriginalPrintChat)
+		return;
+
 	ghHook = { NULL };
 
-	Log("Hooking....");
+#ifdef _DEBUG
+	*gLogFile << "Hooking printChat at: 0x" << std::hex << gOriginalPrintChat << "\r\n";
+#endif
 
 	NTSTATUS didHook = LhInstallHook(gOriginalPrintChat, PrintChatHook, NULL, &ghHook);
 	if (FAILED(didHook))
@@ -154,6 +195,8 @@ extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE
 
 	ULONG ACLEntries[1] = { 0 };
 	LhSetExclusiveACL(ACLEntries, 1, &ghHook);
+	LhGetHookBypassAddress(&ghHook, (void ***)&gBypassAddr);
+	CreateThread(0, 0, ListenPipeAndPrint, 0, 0, 0);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
