@@ -1,29 +1,32 @@
-﻿using System;
+﻿#region
+
+using System;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Pipes;
 using System.Net;
-using EasyHook;
-using System.IO;
 using System.Net.Http;
-using Newtonsoft.Json.Linq;
-using IniParser;
 using System.Text;
-using IniParser.Model;
 using System.Threading;
+using EasyHook;
+using IniParser;
+using Newtonsoft.Json.Linq;
+
+#endregion
 
 namespace Translator
 {
-    class Program
+    internal class Program
     {
-        static string TargetLang = "";
+        private static string _targetLang = "";
 
-        static void Main(string[] args)
+        private static void Main()
         {
             try
             {
                 var parser = new FileIniDataParser();
-                IniData data = parser.ReadFile("Config.ini");
-                TargetLang = data["Translation"]["lang"];
+                var data = parser.ReadFile("Config.ini");
+                _targetLang = data["Translation"]["lang"];
             }
             catch
             {
@@ -31,26 +34,28 @@ namespace Translator
                 File.AppendAllText("Config.ini", "[Translation]" + Environment.NewLine + "lang=en");
                 Console.WriteLine("A new configuration file has been created.");
                 Console.WriteLine("Please edit Config.ini if you wish to change the language (currently English).");
-                TargetLang = "en";
+                _targetLang = "en";
             }
 
             Console.WriteLine("Welcome to DotA 2 Translator (v2)");
-            Console.WriteLine("Translating to: " + TargetLang + " (edit Config.ini to change this).");
+            Console.WriteLine("Translating to: " + _targetLang + " (edit Config.ini to change this).");
 
-            int targetPID = 0;
-            Process[] processes = Process.GetProcesses();
-            for (int i = 0; i < processes.Length; i++)
+            var targetPid = 0;
+            var processes = Process.GetProcesses();
+            foreach (var t in processes)
             {
                 try
                 {
-                    if (processes[i].MainWindowTitle == "Dota 2" && processes[i].HasExited == false)
+                    if (t.MainWindowTitle == "Dota 2" && t.HasExited == false)
                     {
-                        targetPID = processes[i].Id;
+                        targetPid = t.Id;
                     }
                 }
-                catch { }
+                catch
+                {
+                }
             }
-            if (targetPID == 0)
+            if (targetPid == 0)
             {
                 Console.WriteLine("You see, you need to run the game for the translator to do something!");
                 Console.WriteLine("Please start the translator after you start DotA 2");
@@ -68,11 +73,13 @@ namespace Translator
 
             try
             {
-                NativeAPI.RhInjectLibrary(targetPID, 0, NativeAPI.EASYHOOK_INJECT_DEFAULT, "", ".\\Injectee.dll", IntPtr.Zero, 0);
+                NativeAPI.RhInjectLibrary(targetPid, 0, NativeAPI.EASYHOOK_INJECT_DEFAULT, "", ".\\Injectee.dll",
+                    IntPtr.Zero, 0);
             }
             catch (Exception e)
             {
-                Console.WriteLine("Could not inject our DLL into DotA 2. Please post the following message on /r/dotatranslator for help");
+                Console.WriteLine(
+                    "Could not inject our DLL into DotA 2. Please post the following message on /r/dotatranslator for help");
                 Console.WriteLine(e.Message);
                 Console.ReadKey();
                 Environment.Exit(-1);
@@ -83,7 +90,7 @@ namespace Translator
             Environment.Exit(0);
         }
 
-        static async void ListenPipeAndTranslate(NamedPipeServerStream server1, NamedPipeServerStream server2)
+        private static async void ListenPipeAndTranslate(NamedPipeServerStream server1, NamedPipeServerStream server2)
         {
             do
             {
@@ -92,18 +99,20 @@ namespace Translator
                     await server1.WaitForConnectionAsync();
                     await server2.WaitForConnectionAsync();
                     Console.WriteLine("GLHF!");
-                    while (true && server1.IsConnected && server2.IsConnected)
+                    while (server1.IsConnected && server2.IsConnected)
                     {
-                        byte[] buffer = new byte[1000];
+                        var buffer = new byte[1000];
                         server1.Read(buffer, 0, 2);
-                        int numBytes = BitConverter.ToUInt16(buffer, 0);
+                        var numBytes = BitConverter.ToUInt16(buffer, 0);
                         server1.Read(buffer, 0, numBytes);
                         Array.Resize(ref buffer, numBytes);
 
                         if (numBytes == 0)
+                        {
                             continue;
+                        }
 
-                        byte[] messageParams = new byte[100];
+                        var messageParams = new byte[100];
                         server1.Read(messageParams, 0, 2);
                         numBytes = BitConverter.ToUInt16(messageParams, 0);
                         server1.Read(messageParams, 0, numBytes);
@@ -120,28 +129,32 @@ namespace Translator
             } while (true);
         }
 
-        static async void TranslateAndPrint(string message, NamedPipeServerStream sw, byte[] messageParams)
+        private static async void TranslateAndPrint(string message, Stream sw, byte[] messageParams)
         {
             // These messages are already in the user's language
             // They contain HTML too, so I'm not gonna bother translate them
-            if (message.Contains("<img") || message.Contains("<font")) { return; }
+            if (message.Contains("<img") || message.Contains("<font"))
+            {
+                return;
+            }
 
             try
             {
-                string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=" + TargetLang + "&dt=t&q=" + WebUtility.UrlEncode(message);
-                HttpClient hc = new HttpClient();
-                HttpResponseMessage r = await hc.GetAsync(url);
-                String rs = await r.Content.ReadAsStringAsync();
+                var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=" + _targetLang +
+                          "&dt=t&q=" + WebUtility.UrlEncode(message);
+                var hc = new HttpClient();
+                var r = await hc.GetAsync(url);
+                var rs = await r.Content.ReadAsStringAsync();
                 dynamic d = JArray.Parse(rs);
-                string translated = d[0][0][0];
-                string sourcelang = d[2];
+                var translated = d[0][0][0];
+                var sourcelang = d[2];
                 Console.WriteLine("Original: " + message);
-                string toSend = "(Translated from " + sourcelang + "): " + translated;
-                if (sourcelang != TargetLang)
+                var toSend = "(Translated from " + sourcelang + "): " + translated;
+                if (sourcelang != _targetLang)
                 {
-                    UnicodeEncoding ue = new UnicodeEncoding(false, false, false);
-                    byte[] sendBytes = ue.GetBytes(toSend);
-                    byte[] size = BitConverter.GetBytes((UInt16)sendBytes.Length);
+                    var ue = new UnicodeEncoding(false, false, false);
+                    var sendBytes = ue.GetBytes(toSend);
+                    var size = BitConverter.GetBytes((ushort) sendBytes.Length);
                     // Write the number of raw bytes in this message
                     sw.Write(size, 0, 2);
                     // Write the UTF-16 encoded message
