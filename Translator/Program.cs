@@ -114,7 +114,6 @@ namespace Translator
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.ToString());
                     Console.WriteLine("DotA 2 has exited - press any key to close.");
                     return;
                 }
