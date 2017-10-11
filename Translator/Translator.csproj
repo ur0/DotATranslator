@@ -115,8 +115,8 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>del $(ProjectDir)\bin\$(Configuration)\Injectee.dll
-copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)bin\$(Configuration)\Injectee.dll</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
     <PreBuildEvent>
