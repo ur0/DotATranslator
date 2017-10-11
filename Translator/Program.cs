@@ -112,7 +112,7 @@ namespace Translator
                         TranslateAndPrint(Encoding.Unicode.GetString(buffer), server2, messageParams);
                     }
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     Console.WriteLine("DotA 2 has exited - press any key to close.");
                     return;
