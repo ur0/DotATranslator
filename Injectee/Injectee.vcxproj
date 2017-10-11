@@ -75,13 +75,15 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <CustomBuildAfterTargets>Build</CustomBuildAfterTargets>
+    <CustomBuildAfterTargets>
+    </CustomBuildAfterTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -108,15 +110,25 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\packages\EasyHookNativePackage.2.7.6270\build\native\lib\x64\v140\Debug\EasyHook64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\packages\EasyHookNativePackage.2.7.6270\build\native\lib\x64\v140\Release\EasyHook64.lib;psapi.lib</AdditionalDependencies>
+      <OutputFile>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName)$(TargetExt)</OutputFile>
+      <ManifestFile>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).immidiate.manifest</ManifestFile>
+      <ProgramDatabaseFile>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).pdb</ProgramDatabaseFile>
+      <ProfileGuidedDatabase>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).pgd</ProfileGuidedDatabase>
+      <ImportLibrary>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).lib</ImportLibrary>
     </Link>
     <CustomBuildStep>
-      <Command>COPY x64\$(Configuration)\Injectee.dll Translator\bin\$(Configuration)\</Command>
-      <Inputs>x64\$(Configuration)\Injectee.dll;%(Inputs)</Inputs>
-    </CustomBuildStep>
-    <PostBuildEvent>
       <Command>
       </Command>
+      <Inputs>
+      </Inputs>
+      <Message />
+    </CustomBuildStep>
+    <PostBuildEvent>
+      <Command>mkdir $(ProjectDir)..\Translator\bin\$(Configuration)
+copy $(ProjectDir)x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y
+copy $(ProjectDir)x64\$(Configuration)\Injectee.pdb $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
+      <Message>Copy built library</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -151,14 +163,22 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\packages\EasyHookNativePackage.2.7.6270\build\native\lib\x64\v140\Release\EasyHook64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\packages\EasyHookNativePackage.2.7.6270\build\native\lib\x64\v140\Release\EasyHook64.lib;psapi.lib</AdditionalDependencies>
+      <OutputFile>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName)$(TargetExt)</OutputFile>
+      <ManifestFile>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).immidiate.manifest</ManifestFile>
+      <ProgramDatabaseFile>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).pdb</ProgramDatabaseFile>
+      <ProfileGuidedDatabase>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).pgd</ProfileGuidedDatabase>
+      <ImportLibrary>$(MSBuildProjectDirectory)\$(Platform)\$(Configuration)\$(TargetName).lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
       <Command>mkdir $(ProjectDir)..\Translator\bin\$(Configuration)
-copy $(ProjectDir)..\x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y
-copy $(ProjectDir)..\x64\$(Configuration)\Injectee.pdb $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
-      <Message>Copy artifacts</Message>
+copy $(ProjectDir)x64\$(Configuration)\Injectee.dll $(ProjectDir)..\Translator\bin\$(Configuration) /y
+copy $(ProjectDir)x64\$(Configuration)\Injectee.pdb $(ProjectDir)..\Translator\bin\$(Configuration) /y</Command>
+      <Message>Copy built library</Message>
     </PostBuildEvent>
+    <CustomBuildStep>
+      <Message />
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
