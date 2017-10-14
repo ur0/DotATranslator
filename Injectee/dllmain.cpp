@@ -8,14 +8,15 @@
 #include <Psapi.h>
 
 // The function prologue for CUserMessageSayText2::MergeFrom
-const byte gcSignature[] = { 0x48,0x89,0x5C,0x24,0x10,0x57,0x48,0x83,0xEC,0x70,0x33,0xC0,0x48,0x8B,0xFA,0x89,0x84,0x24,0x80,0x00,0x00,0x00,0x48,0x8B,0xD9,0x48,0x3B,0xD1,0x75,0x3E,0x41,0xB9,0x72,0x17,0x00,0x00 };
+const byte gcSignature[] = { 0x48,0x89,0x5C,0x24,0x10,0x48,0x89,0x6C,0x24,0x18,0x48,0x89,0x74,0x24,0x20,0x57,0x41,0x56,0x41,0x57,0xB8,0x30,0x18,0x00,0x00 };
 
-int64_t(*gOriginalMergeFrom)(void*, void*);
+int64_t(*gOriginalMergeFrom)(void*, void*, char);
 int64_t(*gBypassAddr)(void*, void*);
 
 struct SavedMergeFromParams {
 	void* a1;
 	void* a2;
+	char a3;
 };
 
 std::fstream* gLogFile;
@@ -49,12 +50,13 @@ void WriteChatMsgToNamedPipe(wchar_t* msg) {
 		LogError();
 }
 
-void WriteMessageParamsToNamedPipe(void *a1, void *a2) {
+void WriteMessageParamsToNamedPipe(void *a1, void *a2, char a3) {
 	SavedMergeFromParams params;
 	short size = sizeof(params);
 
 	params.a1 = a1;
 	params.a2 = a2;
+	params.a3 = a3;
 
 	if (!WriteFile(ghPipe1, &size, sizeof(size), NULL, NULL))
 		LogError();
@@ -62,7 +64,7 @@ void WriteMessageParamsToNamedPipe(void *a1, void *a2) {
 		LogError();
 }
 
-int64_t __fastcall MergeFromHook(void *a1, void *a2) {
+int64_t __fastcall MergeFromHook(void *a1, void *a2, char a3) {
 	//WriteChatMsgToNamedPipe(message);
 	//WriteMessageParamsToNamedPipe(a1, a2, a4);
 #ifdef _DEBUG
@@ -72,7 +74,7 @@ int64_t __fastcall MergeFromHook(void *a1, void *a2) {
 	*gLogFile << "\r\na2: " << std::hex << a2;
 	gLogFile->flush();
 #endif
-	return gOriginalMergeFrom(a1, a2);
+	return gOriginalMergeFrom(a1, a2, a3);
 }
 
 DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
@@ -174,7 +176,7 @@ extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE
 		return;
 	}
 
-	gOriginalMergeFrom = (int64_t(*) (void*, void*))FindPrintChatAddr(&mi);
+	gOriginalMergeFrom = (int64_t(*) (void*, void*, char))FindPrintChatAddr(&mi);
 	if (!gOriginalMergeFrom)
 		return;
 
