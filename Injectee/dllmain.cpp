@@ -7,16 +7,15 @@
 #include <comdef.h>
 #include <Psapi.h>
 
-// The function prologue for CDOTA_SF_Hud_Chat::MessagePrintf
-const byte gcSignature[] = { 0x48,0x8B,0xC4,0x55,0x56,0x41,0x55,0x41,0x56,0x41,0x57 };
+// The function prologue for CUserMessageSayText2::MergeFrom
+const byte gcSignature[] = { 0x48,0x89,0x5C,0x24,0x10,0x57,0x48,0x83,0xEC,0x70,0x33,0xC0,0x48,0x8B,0xFA,0x89,0x84,0x24,0x80,0x00,0x00,0x00,0x48,0x8B,0xD9,0x48,0x3B,0xD1,0x75,0x3E,0x41,0xB9,0x72,0x17,0x00,0x00 };
 
-int64_t(*gOriginalPrintChat)(void *, int, wchar_t*, int);
-int64_t(*gBypassAddr)(void *, int, wchar_t*, int);
+int64_t(*gOriginalMergeFrom)(void*, void*);
+int64_t(*gBypassAddr)(void*, void*);
 
-struct SavedPrintChatParams {
+struct SavedMergeFromParams {
 	void* a1;
-	int a2;
-	int a4;
+	void* a2;
 };
 
 std::fstream* gLogFile;
@@ -50,13 +49,12 @@ void WriteChatMsgToNamedPipe(wchar_t* msg) {
 		LogError();
 }
 
-void WriteMessageParamsToNamedPipe(void *a1, int a2, int a4) {
-	SavedPrintChatParams params;
+void WriteMessageParamsToNamedPipe(void *a1, void *a2) {
+	SavedMergeFromParams params;
 	short size = sizeof(params);
 
 	params.a1 = a1;
 	params.a2 = a2;
-	params.a4 = a4;
 
 	if (!WriteFile(ghPipe1, &size, sizeof(size), NULL, NULL))
 		LogError();
@@ -64,17 +62,17 @@ void WriteMessageParamsToNamedPipe(void *a1, int a2, int a4) {
 		LogError();
 }
 
-int64_t __fastcall PrintChatHook(void *a1, int a2, wchar_t* message, int a4) {
-	WriteChatMsgToNamedPipe(message);
-	WriteMessageParamsToNamedPipe(a1, a2, a4);
+int64_t __fastcall MergeFromHook(void *a1, void *a2) {
+	//WriteChatMsgToNamedPipe(message);
+	//WriteMessageParamsToNamedPipe(a1, a2, a4);
 #ifdef _DEBUG
+	*gLogFile << "Called!\r\n";
 	*gLogFile << "Status at send:\r\n";
 	*gLogFile << "a1: " << std::hex << a1;
 	*gLogFile << "\r\na2: " << std::hex << a2;
-	*gLogFile << "\r\na4: " << std::hex << a4 << "\r\n";
 	gLogFile->flush();
 #endif
-	return gOriginalPrintChat(a1, a2, message, a4);
+	return gOriginalMergeFrom(a1, a2);
 }
 
 DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
@@ -110,7 +108,7 @@ DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 		size_t l = wcslen((wchar_t *)buf);
 
 		// Retrive the message parameters
-		SavedPrintChatParams params;
+		SavedMergeFromParams params;
 		if (!ReadFile(ghPipe2, &params, sizeof(params), NULL, NULL))
 			LogError();
 
@@ -119,11 +117,10 @@ DWORD WINAPI ListenPipeAndPrint(LPVOID lpParam) {
 		*gLogFile << "Status at recv:\r\n";
 		*gLogFile << "a1: " << std::hex << params.a1;
 		*gLogFile << "\r\na2: " << std::hex << params.a2;
-		*gLogFile << "\r\na4: " << std::hex << params.a4 << "\r\n";
 		gLogFile->flush();
 #endif
 
-		gBypassAddr(params.a1, params.a2, (wchar_t *)buf, params.a4);
+//		gBypassAddr(params.a1, params.a2, (wchar_t *)buf, params.a4);
 		delete buf;
 		Log("Injected translated message successfully");
 	}
@@ -177,17 +174,17 @@ extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE
 		return;
 	}
 
-	gOriginalPrintChat = (int64_t(*) (void *, int, wchar_t*, int))FindPrintChatAddr(&mi);
-	if (!gOriginalPrintChat)
+	gOriginalMergeFrom = (int64_t(*) (void*, void*))FindPrintChatAddr(&mi);
+	if (!gOriginalMergeFrom)
 		return;
 
 	ghHook = { NULL };
 
 #ifdef _DEBUG
-	*gLogFile << "Hooking printChat at: 0x" << std::hex << gOriginalPrintChat << "\r\n";
+	*gLogFile << "Hooking printChat at: 0x" << std::hex << gOriginalMergeFrom << "\r\n";
 #endif
 
-	NTSTATUS didHook = LhInstallHook(gOriginalPrintChat, PrintChatHook, NULL, &ghHook);
+	NTSTATUS didHook = LhInstallHook(gOriginalMergeFrom, MergeFromHook, NULL, &ghHook);
 	if (FAILED(didHook))
 		Log("Failed to hook printChat :(");
 	else
@@ -196,7 +193,7 @@ extern "C" void __declspec(dllexport) __stdcall NativeInjectionEntryPoint(REMOTE
 	ULONG ACLEntries[1] = { 0 };
 	LhSetExclusiveACL(ACLEntries, 1, &ghHook);
 	LhGetHookBypassAddress(&ghHook, (void ***)&gBypassAddr);
-	CreateThread(0, 0, ListenPipeAndPrint, 0, 0, 0);
+	//CreateThread(0, 0, ListenPipeAndPrint, 0, 0, 0);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
