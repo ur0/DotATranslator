@@ -103,28 +103,31 @@ namespace Translator
                         if (numBytes == 0)
                             continue;
 
-                        byte[] messageParams = new byte[100];
-                        server1.Read(messageParams, 0, 2);
-                        numBytes = BitConverter.ToUInt16(messageParams, 0);
-                        server1.Read(messageParams, 0, numBytes);
-                        Array.Resize(ref messageParams, numBytes);
-
-                        TranslateAndPrint(Encoding.Unicode.GetString(buffer), server2, messageParams);
+                        TranslateAndPrint(Encoding.UTF8.GetString(buffer), server2);
                     }
                 }
                 catch (Exception e)
                 {
+#if DEBUG
+                    Console.WriteLine("Exception: " + e.Message);
+#endif
                     Console.WriteLine("DotA 2 has exited - press any key to close.");
                     return;
                 }
             } while (true);
         }
 
-        static async void TranslateAndPrint(string message, NamedPipeServerStream sw, byte[] messageParams)
+        static async void TranslateAndPrint(string message, NamedPipeServerStream sw)
         {
             // These messages are already in the user's language
             // They contain HTML too, so I'm not gonna bother translate them
-            if (message.Contains("<img") || message.Contains("<font")) { return; }
+            if (message.Contains("<img") || message.Contains("<font")) {
+#if DEBUG
+                Console.Write("Ignored message: ");
+                Console.WriteLine(message);
+#endif
+                return;
+            }
 
             try
             {
@@ -146,9 +149,6 @@ namespace Translator
                     sw.Write(size, 0, 2);
                     // Write the UTF-16 encoded message
                     sw.Write(sendBytes, 0, sendBytes.Length);
-                    // Write the message parameters
-                    sw.Write(messageParams, 0, messageParams.Length);
-                    sw.Flush();
                     Console.WriteLine(toSend);
                 }
             }
